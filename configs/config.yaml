@@ -1,0 +1,51 @@
+# MOE训练配置文件
+seed: 42
+exp_name: "moe_trajectory_prediction"
+debug: false
+devices: [0]
+load_num_workers: 4
+
+# 方法配置
+method:
+  model_name: "MOE"
+  train_batch_size: 4
+  eval_batch_size: 4
+  max_epochs: 10
+  grad_clip_norm: 1.0
+  learning_rate: 0.001
+  learning_rate_sched: [5, 8]
+  
+  # MOE特定配置
+  num_experts: 2
+  hidden_size: 128
+  past_len: 20
+  num_map_feature: 64
+  num_agent_feature: 32
+  num_queries_enc: 16
+  num_queries_dec: 16
+  max_num_roads: 100
+  max_num_agents: 30
+  
+  # 路由器配置
+  router:
+    k: 2
+    
+  # 专家模型配置
+  experts_cfg:
+    - model_name: "AutoBot"
+      # AutoBot特定参数
+    - model_name: "Wayformer"
+      # Wayformer特定参数
+
+# 数据集配置
+dataset:
+  name: "dummy"
+  data_path: "./data"
+  past_len: 20
+  future_len: 60
+
+# 评估配置
+eval: false
+eval_waymo: false
+eval_nuscenes: false
+eval_argoverse2: false

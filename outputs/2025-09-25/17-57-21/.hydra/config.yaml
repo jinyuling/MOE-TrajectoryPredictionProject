@@ -1,0 +1,16 @@
+seed: 42
+exp_name: moe_trajectory_prediction
+debug: false
+devices:
+- 0
+load_num_workers: 4
+method: MOE
+dataset:
+  name: dummy
+  data_path: ./data
+  past_len: 20
+  future_len: 60
+eval: false
+eval_waymo: false
+eval_nuscenes: false
+eval_argoverse2: false

@@ -1,129 +1,69 @@
 import json
+"""
+简化版BaseModel类
+"""
 
-import numpy as np
 import pytorch_lightning as pl
-import torch
-import wandb
-import pandas as pd
-import os
-import unitraj.datasets.common_utils as common_utils
-import unitraj.utils.visualization as visualization
-import csv
 
 class BaseModel(pl.LightningModule):
-
-    def __init__(self, config):
+    """基础模型类"""
+    
+    def __init__(self, config=None):
         super().__init__()
-        self.config = config
-
-        self.pred_dicts = []
-
-        if config.get('eval_nuscenes', False):
-            self.init_nuscenes()
-
-    def init_nuscenes(self):
-        if self.config.get('eval_nuscenes', False):
-            from nuscenes import NuScenes
-
-            from nuscenes.eval.prediction.config import PredictionConfig
-
-            from nuscenes.prediction import PredictHelper
-            nusc = NuScenes(version='v1.0-trainval', dataroot=self.config['nuscenes_dataroot'])
-
-            # Prediction helper and configs:
-            self.helper = PredictHelper(nusc)
-
-            with open('models/base_model/nuscenes_config.json', 'r') as f:
-                pred_config = json.load(f)
-            self.pred_config5 = PredictionConfig.deserialize(pred_config, self.helper)
-
-    def forward(self, batch):
+        # 确保config是一个字典或None
+        if config is None:
+            self.config = {}
+        elif isinstance(config, str):
+            self.config = {}
+        else:
+            self.config = config
+    
+    def forward(self, x):
         """
-        Forward pass for the model
-        :param batch: input batch
-        :return: prediction: {
-                'predicted_probability': (batch_size,modes)),
-                'predicted_trajectory': (batch_size,modes, future_len, 2)
-                }
-                loss (with gradient)
+        前向传播
+        
+        Args:
+            x: 输入数据
+            
+        Returns:
+            预测结果和损失
         """
         raise NotImplementedError
     
-    def load_balance_loss(self, routing_probs):
-        """计算负载平衡损失，鼓励专家均匀使用"""
-        # 计算每个专家的平均使用概率
-        expert_mean = routing_probs.mean(dim=0)
-        # 计算负载平衡损失
-        loss = (expert_mean * routing_probs.sum(dim=0)).sum() / routing_probs.size(0)
-        return loss
-        
     def training_step(self, batch, batch_idx):
-        if self.config['method']['model_name']=='MOE':
-            prediction, loss, routing_probs = self.forward(batch)
-            self.log_info(batch, batch_idx, prediction, status='train')
+        """
+        训练步骤
+        
+        Args:
+            batch: 批次数据
+            batch_idx: 批次索引
             
-            # 添加负载平衡损失
-            lb_loss = self.load_balance_loss(routing_probs)
-            lb_loss_weight = 0.01  # 负载平衡损失权重
-            total_loss = loss + lb_loss_weight * lb_loss
-
-            # 记录路由概率分布
-            routing_mean = routing_probs.mean(dim=0)
-            for i in range(routing_mean.size(0)):
-                self.log(f'train/routing_prob_expert_{i}', routing_mean[i], on_step=False, on_epoch=True)
-            
-            self.log('train/lb_loss', lb_loss, on_step=False, on_epoch=True)
-            self.log('train/total_loss', total_loss, on_step=False, on_epoch=True)
-            
-            # 保存损失到CSV文件
-            csv_path = './logs/moe_loss.csv'
-            os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-            write_header = not os.path.exists(csv_path)
-
-            with open(csv_path, 'a', newline='') as f:
-                writer = csv.writer(f)
-                if write_header:
-                    writer.writerow(['epoch', 'batch_idx', 'total_loss', 'main_loss', 'lb_loss'])  # 表头
-                writer.writerow([self.current_epoch, batch_idx, total_loss.item(), loss.item(), lb_loss.item()])
-
-            return total_loss
-        else:
-            prediction, loss = self.forward(batch)
-            self.log_info(batch, batch_idx, prediction, status='train')
-            
-            # 保存损失到CSV文件
-            csv_path = './logs/auto_loss.csv'
-            os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-            write_header = not os.path.exists(csv_path)
-
-            with open(csv_path, 'a', newline='') as f:
-                writer = csv.writer(f)
-                if write_header:
-                    writer.writerow(['epoch', 'batch_idx', 'loss'])  # 表头
-                writer.writerow([self.current_epoch, batch_idx, loss.item()])
-
-            return loss
-
+        Returns:
+            训练损失
+        """
+        raise NotImplementedError
+    
     def validation_step(self, batch, batch_idx):
-        if self.config['method']['model_name']=='MOE':
-            prediction, loss, routing_probs = self.forward(batch)
-            self.compute_official_evaluation(batch, prediction)
-            self.log_info(batch, batch_idx, prediction, status='val')
+        """
+        验证步骤
+        
+        Args:
+            batch: 批次数据
+            batch_idx: 批次索引
             
-            # 添加负载平衡损失
-            lb_loss = self.load_balance_loss(routing_probs)
-            lb_loss_weight = 0.01  # 负载平衡损失权重
-            total_loss = loss + lb_loss_weight * lb_loss
-            
-            self.log('val/lb_loss', lb_loss, on_step=False, on_epoch=True)
-            self.log('val/total_loss', total_loss, on_step=False, on_epoch=True)
-            
-            return total_loss
-        else:
-            prediction, loss = self.forward(batch)
-            self.compute_official_evaluation(batch, prediction)
-            self.log_info(batch, batch_idx, prediction, status='val')
-            return loss
+        Returns:
+            验证损失
+        """
+        raise NotImplementedError
+    
+    def configure_optimizers(self):
+        """
+        配置优化器
+        
+        Returns:
+            优化器和调度器
+        """
+        raise NotImplementedError
 
     def on_validation_epoch_end(self):
         if self.config.get('eval_waymo', False):
@@ -142,9 +82,6 @@ class BaseModel(pl.LightningModule):
             metric_results = self.compute_metrics_av2(self.pred_dicts)
             
         self.pred_dicts = []
-
-    def configure_optimizers(self):
-        raise NotImplementedError
 
     def compute_metrics_nuscenes(self, pred_dicts):
         from nuscenes.eval.prediction.compute_metrics import compute_metrics
