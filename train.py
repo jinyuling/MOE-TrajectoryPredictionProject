@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint  # Import ModelCheckpoin
 import hydra
 from omegaconf import OmegaConf
 import os
+import csv
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
@@ -44,7 +45,7 @@ def train(cfg):
         for expert in model.experts:
             for param in expert.parameters():
                 param.requires_grad = False
-        print("�� All expert parameters frozen, only Router will be trained")
+        print("🔒 All expert parameters frozen, only Router will be trained")
 
     train_set = build_dataset(cfg)
     val_set = build_dataset(cfg, val=True)
@@ -97,5 +98,3 @@ def train(cfg):
 if __name__ == '__main__':
     wandb.init(mode="offline")
     train()
-
-

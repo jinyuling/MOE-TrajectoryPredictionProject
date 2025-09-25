@@ -9,7 +9,6 @@ import os
 import unitraj.datasets.common_utils as common_utils
 import unitraj.utils.visualization as visualization
 import csv
-import os
 
 class BaseModel(pl.LightningModule):
 
@@ -50,57 +49,76 @@ class BaseModel(pl.LightningModule):
         """
         raise NotImplementedError
     
-    def load_balance_loss(self,routing_probs):
+    def load_balance_loss(self, routing_probs):
+        """计算负载平衡损失，鼓励专家均匀使用"""
+        # 计算每个专家的平均使用概率
         expert_mean = routing_probs.mean(dim=0)
-        loss = (expert_mean * routing_probs.sum(dim=0)).sum()
+        # 计算负载平衡损失
+        loss = (expert_mean * routing_probs.sum(dim=0)).sum() / routing_probs.size(0)
         return loss
         
     def training_step(self, batch, batch_idx):
-
-
         if self.config['method']['model_name']=='MOE':
-            prediction, loss ,routing_probs = self.forward(batch)
+            prediction, loss, routing_probs = self.forward(batch)
             self.log_info(batch, batch_idx, prediction, status='train')
+            
+            # 添加负载平衡损失
             lb_loss = self.load_balance_loss(routing_probs)
-            lb_loss = lb_loss * 0.01
-            loss = lb_loss + loss
+            lb_loss_weight = 0.01  # 负载平衡损失权重
+            total_loss = loss + lb_loss_weight * lb_loss
 
-
-            csv_path = '/home/test/localdata2/zzs/unitraj__MOE_logs/moe_loss.csv'
+            # 记录路由概率分布
+            routing_mean = routing_probs.mean(dim=0)
+            for i in range(routing_mean.size(0)):
+                self.log(f'train/routing_prob_expert_{i}', routing_mean[i], on_step=False, on_epoch=True)
+            
+            self.log('train/lb_loss', lb_loss, on_step=False, on_epoch=True)
+            self.log('train/total_loss', total_loss, on_step=False, on_epoch=True)
+            
+            # 保存损失到CSV文件
+            csv_path = './logs/moe_loss.csv'
+            os.makedirs(os.path.dirname(csv_path), exist_ok=True)
             write_header = not os.path.exists(csv_path)
 
             with open(csv_path, 'a', newline='') as f:
                 writer = csv.writer(f)
                 if write_header:
-                    writer.writerow(['batch_idx', 'loss', 'lb_loss'])  # 只写一次表头
-                writer.writerow([batch_idx, loss.item(), lb_loss.item()])
+                    writer.writerow(['epoch', 'batch_idx', 'total_loss', 'main_loss', 'lb_loss'])  # 表头
+                writer.writerow([self.current_epoch, batch_idx, total_loss.item(), loss.item(), lb_loss.item()])
 
-
-            return loss
-
-        else :
+            return total_loss
+        else:
             prediction, loss = self.forward(batch)
             self.log_info(batch, batch_idx, prediction, status='train')
-            csv_path = '/home/test/localdata2/zzs/unitraj__MOE_logs/auto_loss.csv'
+            
+            # 保存损失到CSV文件
+            csv_path = './logs/auto_loss.csv'
+            os.makedirs(os.path.dirname(csv_path), exist_ok=True)
             write_header = not os.path.exists(csv_path)
 
             with open(csv_path, 'a', newline='') as f:
                 writer = csv.writer(f)
                 if write_header:
-                    writer.writerow(['batch_idx', 'loss'])  # 只写一次表头
-                writer.writerow([batch_idx, loss.item()])
+                    writer.writerow(['epoch', 'batch_idx', 'loss'])  # 表头
+                writer.writerow([self.current_epoch, batch_idx, loss.item()])
 
             return loss
 
     def validation_step(self, batch, batch_idx):
         if self.config['method']['model_name']=='MOE':
-            prediction, loss ,routing_probs = self.forward(batch)
+            prediction, loss, routing_probs = self.forward(batch)
             self.compute_official_evaluation(batch, prediction)
             self.log_info(batch, batch_idx, prediction, status='val')
+            
+            # 添加负载平衡损失
             lb_loss = self.load_balance_loss(routing_probs)
-            lb_loss = lb_loss * 0.01
-            loss = lb_loss + loss
-            return loss
+            lb_loss_weight = 0.01  # 负载平衡损失权重
+            total_loss = loss + lb_loss_weight * lb_loss
+            
+            self.log('val/lb_loss', lb_loss, on_step=False, on_epoch=True)
+            self.log('val/total_loss', total_loss, on_step=False, on_epoch=True)
+            
+            return total_loss
         else:
             prediction, loss = self.forward(batch)
             self.compute_official_evaluation(batch, prediction)
@@ -124,8 +142,6 @@ class BaseModel(pl.LightningModule):
             metric_results = self.compute_metrics_av2(self.pred_dicts)
             
         self.pred_dicts = []
-
-
 
     def configure_optimizers(self):
         raise NotImplementedError
@@ -167,16 +183,10 @@ class BaseModel(pl.LightningModule):
         self.log('val/av2_official_brier_minFDE', metric_results['brier_min_FDE'], prog_bar=True, on_step=False, on_epoch=True)
         self.log('val/av2_official_miss_rate', metric_results['miss_rate'], prog_bar=True, on_step=False, on_epoch=True)
         
-        # metric_result_str = '\n'
-        # for key, value in metric_results.items():
-        #     metric_result_str += '%s: %.4f\n' % (key, value)
-        # metric_result_str += '\n'
-        # print(metric_result_str)
         return metric_results
         
     def compute_official_evaluation(self, batch_dict, prediction):
         if self.config.get('eval_waymo', False):
-
             input_dict = batch_dict['input_dict']
             pred_scores = prediction['predicted_probability']
             pred_trajs = prediction['predicted_trajectory']
@@ -242,7 +252,6 @@ class BaseModel(pl.LightningModule):
             self.pred_dicts += pred_dict_list
         
         elif self.config.get('eval_argoverse2', False):
-
             input_dict = batch_dict['input_dict']
             pred_scores = prediction['predicted_probability']
             pred_trajs = prediction['predicted_trajectory']
@@ -323,7 +332,6 @@ class BaseModel(pl.LightningModule):
         # loss_dict.update(avg_dict)
 
         if status == 'val' and self.config.get('eval', False):
-
             # Split scores based on trajectory type
             new_dict = {}
             trajectory_types = inputs["trajectory_type"].cpu().numpy()
@@ -369,11 +377,8 @@ class BaseModel(pl.LightningModule):
         for k, v in loss_dict.items():
             self.log(status + "/" + k, v, on_step=False, on_epoch=True, sync_dist=True, batch_size=size_dict[k])
 
-        # if self.local_rank == 0 and status == 'val' and batch_idx == 0:
-        #     img = visualization.visualize_prediction(batch, prediction)
-        #     wandb.log({"prediction": [wandb.Image(img)]})
-                # === 保存为CSV ===
-        log_dir = "/home/test/localdata2/zzs/unitraj__MOE_logs"      # 绝对路径
+        # 保存为CSV
+        log_dir = "./logs"      # 相对路径
         os.makedirs(log_dir, exist_ok=True)
         exp_name = self.config.get("exp_name", "default_exp")
         csv_file = os.path.join(log_dir, f"{exp_name}.csv")
