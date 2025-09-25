@@ -164,9 +164,9 @@ def main():
     
     if not long_path_enabled:
         print("\n1. 启用Windows长路径支持:")
-        print("   运行以下命令作为管理员:")
+        print("   方法一: 运行以下命令作为管理员:")
         print("   Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\FileSystem' -Name 'LongPathsEnabled' -Value 1")
-        print("   或者运行此脚本中的启用功能")
+        print("   方法二: 运行项目中的 enable_long_paths.bat 文件（以管理员身份运行）")
         
         # 询问是否要启用
         choice = input("\n是否要尝试启用长路径支持？(y/n): ").lower()
@@ -203,6 +203,7 @@ if __name__ == "__main__":
         is_admin = ctypes.windll.shell32.IsUserAnAdmin()
         if not is_admin:
             print("⚠️  某些操作可能需要管理员权限")
+            print("💡 建议以管理员身份运行此脚本或使用 enable_long_paths.bat 文件")
     except:
         pass
     
