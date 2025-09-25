@@ -1,4 +1,4 @@
-# MOE轨迹预测模型
+# MOE轨迹预测项目
 
 ## 项目简介
 
@@ -28,7 +28,10 @@ MOE项目/
 ├── simple_moe.py        # 简化MOE演示
 ├── simple_train.py      # 简化训练演示
 ├── setup_windows.py     # Windows环境设置
-└── run_project.py       # 运行指南
+├── enable_long_paths.bat # 启用长路径支持批处理
+├── run_project.py       # 运行指南
+├── .gitignore           # Git忽略文件
+└── ... (其他文档文件)
 ```
 
 ## 环境要求
@@ -112,6 +115,10 @@ python train.py method=MOE
 
 - [git_tutorial.py](file:///c:/Users/Administrator/Desktop/01/git_tutorial.py)：Git版本控制教程
 - [setup_env.py](file:///c:/Users/Administrator/Desktop/01/setup_env.py)：环境设置说明
+
+## GitHub仓库
+
+代码已托管在GitHub：[MOE-TrajectoryPredictionProject](https://github.com/jinyuling/MOE-TrajectoryPredictionProject)
 
 ## 贡献
 
