@@ -139,6 +139,8 @@ def show_project_structure():
     ├── test_moe.py          # MOE测试
     ├── debug_router.py      # 路由调试
     ├── simple_moe.py        # 简化MOE演示
+    ├── simple_train.py      # 简化训练演示
+    ├── setup_windows.py     # Windows环境设置
     └── run_project.py       # 运行指南
     """
     
@@ -174,9 +176,31 @@ def show_troubleshooting():
    - 检查路由概率是否正确计算
    - 验证专家模型是否正确冻结
    - 确认损失函数组合是否正确
+
+6. ❌ Windows长路径问题
+   💡 解决方案:
+   - 运行 setup_windows.py 脚本启用长路径支持
+   - 或使用conda安装避免此问题
     """
     
     print(troubleshooting)
+
+def show_windows_setup():
+    """显示Windows特殊设置"""
+    print_header("Windows特殊设置")
+    
+    print("🔧 Windows用户请注意:")
+    print("1. 长路径问题:")
+    print("   - 运行 'python setup_windows.py' 启用长路径支持")
+    print("   - 或使用conda安装避免此问题")
+    
+    print("\n2. 权限问题:")
+    print("   - 某些操作可能需要管理员权限")
+    print("   - 建议以管理员身份运行命令提示符")
+    
+    print("\n3. DLL加载问题:")
+    print("   - 推荐使用conda而不是pip安装PyTorch")
+    print("   - 如果必须使用pip，考虑安装CPU版本")
 
 def main():
     """主函数"""
@@ -192,6 +216,11 @@ def main():
     
     # 安装依赖说明
     install_dependencies()
+    
+    # Windows特殊设置
+    system = detect_os()
+    if system == "Windows":
+        show_windows_setup()
     
     # 运行测试
     run_tests()
