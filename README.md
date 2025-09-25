@@ -1,120 +1,122 @@
-# MOE 路由选择器调试和改进
+# MOE轨迹预测模型
 
-这个项目是针对MOE（Mixture of Experts）架构中的路由选择器进行调试和改进的代码库。
+## 项目简介
 
-## 问题分析
+本项目是一个基于MOE（Mixture of Experts）架构的车辆轨迹预测模型。项目集成了多个预训练的专家模型，通过路由选择器实现自适应预测，能够根据不同输入选择最适合的专家模型进行轨迹预测。
 
-在原始实现中，路由选择器训练存在以下问题：
+## 项目特点
 
-1. **损失无法下降**：路由选择器的损失在训练过程中无法有效下降
-2. **性能下降**：使用MOE后性能比单独使用专家模型更差
-3. **路由不生效**：路由选择器未能有效选择最适合的专家模型
+- **MOE架构**：集成多个专家模型，通过路由选择器实现智能模型选择
+- **轨迹预测**：专门针对车辆轨迹预测任务优化
+- **模块化设计**：易于扩展和修改
+- **详细文档**：包含完整的开发文档和使用说明
 
-## 改进方案
+## 文件结构
 
-### 1. 路由选择器架构改进
+```
+MOE项目/
+├── base_model.py          # 基础模型类
+├── moe.py                # MOE模型实现
+├── train.py              # 训练脚本
+├── requirements.txt      # 依赖列表
+├── README.md            # 项目说明
+├── IMPROVEMENTS.md      # 改进说明
+├── check_env.py         # 环境检查
+├── test_structure.py    # 结构测试
+├── test_moe.py          # MOE测试
+├── debug_router.py      # 路由调试
+├── simple_moe.py        # 简化MOE演示
+├── simple_train.py      # 简化训练演示
+├── setup_windows.py     # Windows环境设置
+└── run_project.py       # 运行指南
+```
 
-在 [moe.py](file:///c:/Users/Administrator/Desktop/01/moe.py) 中，我们改进了 [TrajAttentionRouter](file:///c:/Users/Administrator/Desktop/01/moe.py#L24-L132) 类：
+## 环境要求
 
-- 增强了轨迹特征提取能力
-- 改进了路网特征编码
-- 优化了注意力机制的使用
-- 添加了更好的权重初始化
+- Python 3.7+
+- PyTorch
+- PyTorch Lightning
+- NumPy
+- Pandas
+- WandB
+- Hydra
+- OmegaConf
 
-### 2. 损失函数优化
+## 安装指南
 
-在 [base_model.py](file:///c:/Users/Administrator/Desktop/01/base_model.py) 中，我们改进了损失计算：
+### 使用Conda（推荐，特别是Windows用户）
 
-- 修正了负载平衡损失的计算方式
-- 添加了更详细的日志记录
-- 改进了损失权重的平衡
+```bash
+# 创建虚拟环境
+conda create -n unitraj python=3.9
+conda activate unitraj
 
-### 3. 训练策略调整
+# 安装PyTorch（避免DLL问题）
+conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 
-在 [train.py](file:///c:/Users/Administrator/Desktop/01/train.py) 中，我们保持了专家模型冻结、只训练路由选择器的策略，但添加了更好的日志记录。
+# 安装其他依赖
+pip install pytorch-lightning numpy pandas wandb hydra-core omegaconf
+```
+
+### 使用Pip
+
+```bash
+# 安装PyTorch
+pip install torch torchvision torchaudio
+
+# 安装其他依赖
+pip install -r requirements.txt
+```
 
 ## 使用方法
 
-### 1. 运行测试脚本
-
+### 环境检查
 ```bash
-python test_moe.py
+python check_env.py
 ```
 
-这个脚本会测试路由选择器的基本功能。
-
-### 2. 运行调试脚本
-
+### 运行简化版演示
 ```bash
-python debug_router.py
+# 运行简化版MOE模型演示
+python simple_moe.py
+
+# 运行简化版训练演示
+python simple_train.py
 ```
 
-这个脚本会进行路由选择器的简化训练，验证其学习能力。
-
-### 3. 完整训练
-
-使用原始的训练脚本：
-
+### 完整训练
 ```bash
 python train.py method=MOE
 ```
 
-## 关键改进点
-
-### 1. 特征提取增强
-
-```python
-# 改进的轨迹特征提取器
-self.trajectory_encoder = nn.Sequential(
-    nn.Linear(self.k_attr, self.d_k),
-    nn.ReLU(),
-    nn.LayerNorm(self.d_k),
-    nn.Linear(self.d_k, self.d_k),
-    nn.ReLU(),
-    nn.LayerNorm(self.d_k)
-)
-```
-
-### 2. 负载平衡损失修正
-
-```python
-def load_balance_loss(self, routing_probs):
-    """计算负载平衡损失，鼓励专家均匀使用"""
-    # 计算每个专家的平均使用概率
-    expert_mean = routing_probs.mean(dim=0)
-    # 计算负载平衡损失
-    loss = (expert_mean * routing_probs.sum(dim=0)).sum() / routing_probs.size(0)
-    return loss
-```
-
-### 3. 更好的日志记录
-
-添加了详细的训练日志记录，包括：
-- 路由概率分布
-- 各种损失组件
-- 训练进度跟踪
-
-## 预期效果
-
-通过这些改进，预期能够：
-
-1. **降低训练损失**：路由选择器的损失应该能够有效下降
-2. **提高模型性能**：MOE模型的性能应该至少不低于单独的专家模型
-3. **有效路由选择**：路由选择器应该能够根据不同输入选择最适合的专家
-
 ## 故障排除
 
-如果仍然遇到问题，请检查：
+### Windows常见问题
 
-1. **数据格式**：确保输入数据格式正确
-2. **学习率**：尝试调整路由选择器的学习率
-3. **损失权重**：调整负载平衡损失的权重
-4. **特征提取**：验证特征提取器是否能有效提取轨迹特征
+1. **DLL加载错误**：推荐使用conda安装PyTorch
+2. **长路径问题**：运行`python setup_windows.py`启用长路径支持
+3. **权限问题**：以管理员身份运行命令提示符
 
-## 进一步改进
+### 依赖安装问题
 
-如果基础改进仍然无法解决问题，可以考虑：
+1. **pytorch_lightning安装失败**：尝试使用conda安装或安装CPU版本
+2. **其他依赖问题**：运行`python check_env.py --install`自动安装
 
-1. **联合训练**：同时训练路由选择器和专家模型
-2. **更复杂的路由机制**：使用更高级的路由算法
-3. **专家 specialize**：让专家模型 specialize 于不同的轨迹类型
+## 项目文档
+
+- [IMPROVEMENTS.md](file:///c:/Users/Administrator/Desktop/01/IMPROVEMENTS.md)：详细的技术改进说明
+- [PROJECT_SUMMARY.md](file:///c:/Users/Administrator/Desktop/01/PROJECT_SUMMARY.md)：项目完整总结
+- [run_project.py](file:///c:/Users/Administrator/Desktop/01/run_project.py)：完整的运行指南
+
+## 学习资源
+
+- [git_tutorial.py](file:///c:/Users/Administrator/Desktop/01/git_tutorial.py)：Git版本控制教程
+- [setup_env.py](file:///c:/Users/Administrator/Desktop/01/setup_env.py)：环境设置说明
+
+## 贡献
+
+欢迎提交Issue和Pull Request来改进这个项目。
+
+## 许可证
+
+本项目仅供学习和研究使用。
