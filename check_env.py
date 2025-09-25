@@ -6,6 +6,8 @@
 
 import sys
 import importlib.util
+import subprocess
+import platform
 
 def check_python_version():
     """检查Python版本"""
@@ -36,7 +38,21 @@ def check_package(package_name, install_name=None):
         print(f"❌ {package_name} 未安装，请运行: pip install {install_name}")
         return False
 
-def check_dependencies():
+def install_package(package_name):
+    """尝试安装包"""
+    try:
+        print(f"🔄 尝试安装 {package_name}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+        print(f"✅ {package_name} 安装成功")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"❌ {package_name} 安装失败: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ 安装过程中出现错误: {e}")
+        return False
+
+def check_dependencies(auto_install=False):
     """检查项目依赖"""
     print("\n🔍 检查项目依赖...")
     
@@ -50,12 +66,20 @@ def check_dependencies():
         ("omegaconf", "omegaconf")
     ]
     
+    missing_packages = []
     all_good = True
     for package_name, install_name in dependencies:
         if not check_package(package_name, install_name):
             all_good = False
+            missing_packages.append(install_name)
     
-    return all_good
+    if not all_good and auto_install:
+        print("\n🔄 自动安装缺失的依赖...")
+        for package in missing_packages:
+            if not install_package(package):
+                print(f"⚠️ 无法自动安装 {package}，请手动安装")
+    
+    return all_good or auto_install
 
 def check_files():
     """检查必要的文件是否存在"""
@@ -82,8 +106,11 @@ def main():
     print("🚀 MOE项目环境检查")
     print("=" * 40)
     
+    # 检查是否需要自动安装
+    auto_install = "--install" in sys.argv
+    
     python_ok = check_python_version()
-    deps_ok = check_dependencies()
+    deps_ok = check_dependencies(auto_install)
     files_ok = check_files()
     
     print("\n" + "=" * 40)
@@ -93,6 +120,7 @@ def main():
         print("1. 如果要训练模型，运行: python train.py method=MOE")
         print("2. 如果要测试路由选择器，运行: python debug_router.py")
         print("3. 如果要检查代码结构，运行: python test_structure.py")
+        print("4. 如果要运行简化版演示，运行: python simple_moe.py")
     else:
         print("⚠️ 环境检查未通过，请根据上面的提示安装缺失的依赖。")
         print("\n环境设置建议:")
@@ -103,6 +131,8 @@ def main():
         print("   conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia")
         print("3. 安装其他依赖:")
         print("   pip install -r requirements.txt")
+        print("\n或者尝试自动安装缺失的依赖:")
+        print("   python check_env.py --install")
 
 if __name__ == "__main__":
     main()
